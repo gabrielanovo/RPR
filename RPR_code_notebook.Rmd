@@ -1,0 +1,1965 @@
+---
+title: "Red blood cell distribution width to platelet ratio: A novel noninvasive index aids in the diagnosis of sepsis in neonatal foals"
+subtitle: Code notebook by Gabriela Novo de Oliveira and McCaide Wooten
+output: 
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_depth: 4
+    depth: 2
+    number_sections: false
+    toc_float:
+      collapsed: true
+---
+
+# Dataset overview
+
+### Loading packages
+
+```{r}
+library(plyr)
+library(dplyr)
+library(lubridate)
+library(data.table)
+library(forcats)
+library(ggplot2)
+library(knitr)
+library(lubridate)
+library(purrr)
+library(rmarkdown)
+library(stringr)
+library(tibble)
+library(tidyr)
+library(MASS)
+library(stats)
+library(survival)
+library(labelled)
+library(DescTools)
+```
+
+### **Loading the dataset ('dataset_modified')**
+
+```{r}
+rdw_raw <- read.csv("~/dataset_modified.csv")
+```
+
+### **Dimension of the dataset**
+
+```{r}
+dim(rdw_raw)
+```
+
+### **Structure of the dataset**
+
+```{r}
+str(rdw_raw)
+```
+
+### **Variable names**
+
+```{r}
+names(rdw_raw)
+```
+
+### Summary of variables
+
+```{r}
+summary(rdw_raw)
+```
+
+### **Labeling variables**
+
+```{r}
+var_label(rdw_raw$discharge_status) <- 'Discharge status (alive, euth, died)'
+var_label(rdw_raw$age) <- 'Age at bloodsampling (in hours)'
+var_label(rdw_raw$group) <- 'Group according to sepsis score'
+var_label(rdw_raw$premature) <- 'Premature (yes/no)'
+var_label(rdw_raw$gestational_age) <- 'Gestational age (in days)'
+var_label(rdw_raw$blood_culture_done) <- 'Blood culture: yes (1) or no(2)'
+var_label(rdw_raw$blood_culture_result) <- 'Blood culture result: positive (1) or negative (2)'
+
+```
+
+### **Changing variable types**
+
+```{r}
+rdw_raw$R <- as.numeric(rdw_raw$R)
+rdw_raw$P <- as.numeric(rdw_raw$P)
+rdw_raw$R <- as.numeric(rdw_raw$R)
+rdw_raw$creatinine <- as.numeric(rdw_raw$creatinine)
+rdw_raw$CRT <- as.numeric(rdw_raw$CRT)
+```
+
+### **Looking at the first rows of the dataset**
+
+```{r}
+head(rdw_raw)
+```
+
+### Creating subsets
+
+```{r}
+rdw_healthy_group <- rdw_raw %>%
+  filter(group %in% c('Healthy'))
+dim(rdw_healthy_group)
+
+rdw_sns_group <- rdw_raw %>%
+  filter(group %in% c('SNS'))
+dim(rdw_sns_group)
+
+rdw_septic_group <- rdw_raw %>%
+  filter(group %in% c('Septic'))
+dim(rdw_septic_group)
+
+rdw_subset_sick <- rdw_raw %>%
+  filter(group %in% c('SNS','Septic'))
+
+rdw_survivors <- rdw_raw %>%
+  filter(survival_status %in% c('Survivor'))
+
+rdw_non_survivors <- rdw_raw %>%
+  filter(survival_status %in% c('Non-Survivor'))
+```
+
+### Kruskal-Wallis test to compare medians between groups
+
+```{r}
+kruskal.test(baso~group,data=rdw_raw) 
+kruskal.test(creatinine~group,data=rdw_raw) 
+kruskal.test(CRT~group,data=rdw_raw) 
+kruskal.test(eos~group,data=rdw_raw) 
+kruskal.test(glu~group,data=rdw_raw) 
+kruskal.test(P~group,data=rdw_raw) 
+kruskal.test(HCT~group,data=rdw_raw) 
+kruskal.test(Hg~group,data=rdw_raw) 
+kruskal.test(lactate~group,data=rdw_raw) 
+kruskal.test(lymph~group,data=rdw_raw) 
+kruskal.test(MCH~group,data=rdw_raw) 
+kruskal.test(MCHC~group,data=rdw_raw) 
+kruskal.test(MCV~group,data=rdw_raw) 
+kruskal.test(mono~group,data=rdw_raw) 
+kruskal.test(neut~group,data=rdw_raw) 
+kruskal.test(platelets~group,data=rdw_raw) 
+kruskal.test(RBC~group,data=rdw_raw) 
+kruskal.test(RDW~group,data=rdw_raw) 
+kruskal.test(R~group,data=rdw_raw) 
+kruskal.test(RPR~group,data=rdw_raw) 
+kruskal.test(sepsis_score~group,data=rdw_raw) 
+kruskal.test(T~group,data=rdw_raw) 
+kruskal.test(WBC~group,data=rdw_raw) 
+kruskal.test(WBC~group,data=rdw_raw) 
+
+
+```
+
+### Medians for each group
+
+#### Healthy group
+
+```{r}
+MedianCI(rdw_healthy_group$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_healthy_group$WBC, conf.level=0.95, na.rm=TRUE)
+
+```
+
+#### Sick non-septic (SNS) group
+
+```{r}
+MedianCI(rdw_sns_group$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$WBC, conf.level=0.95, na.rm=TRUE)
+```
+
+#### Septic group
+
+```{r}
+MedianCI(rdw_septic_group$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_sns_group$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_septic_group$WBC, conf.level=0.95, na.rm=TRUE)
+```
+
+## Testing the data for normality
+
+### Q-Q plots
+
+```{r}
+qqPlot(rdw_raw$RDW,main='RDW')
+qqPlot(rdw_raw$RPR,main='RPR')
+```
+
+### Histograms
+
+```{r}
+hist(rdw_raw$RDW)
+hist(rdw_raw$RPR)
+```
+
+### Shapiro-Wilk test for normality
+
+H0: data are normally distributed
+
+Therefore, for p-values \< 0.05, we reject the null and conclude the data are NOT normally distributed
+
+```{r}
+shapiro.test(rdw_raw$RDW)
+shapiro.test(rdw_raw$RPR)
+```
+
+All of the continuous variables yielded a p-value \<0.05, thus leading us to reject the null
+
+### Testing data transformation
+
+### Log transformation
+
+```{r}
+logRDW <- log(rdw_raw$RDW)
+logRPR <- log(rdw_raw$RPR)
+
+par(mfcol=c(2,2))
+qqPlot(logRDW)
+qqPlot(logRPR)
+hist(logRDW)
+hist(logRPR)
+
+shapiro.test(logRDW) 
+shapiro.test(logRPR) 
+```
+
+### Square-root transformation
+
+```{r}
+sqrtRDW <- sqrt(rdw_raw$RDW)
+sqrtRPR <- sqrt(rdw_raw$RPR)
+
+par(mfcol=c(2,2))
+qqPlot(sqrtRDW)
+qqPlot(sqrtRPR)
+hist(sqrtRDW)
+hist(sqrtRPR)
+
+shapiro.test(sqrtRDW) 
+shapiro.test(sqrtRPR) 
+```
+
+Log transformation seems like the best option, therefore it will be used for further analysis
+
+### Log transformed dataset
+
+```{r}
+rdw_log <- rdw_raw %>%
+  mutate(logRDW = log(rdw_raw$RDW)) %>%
+  mutate(logRPR = log(rdw_raw$RPR)) 
+```
+
+Log transforming the data improved normality, but the data still doesn't follow a normal distribution. Therefore, non-parametric tests will be conducted.
+
+## Kruskal-Wallis test
+
+Kruskal-Wallis test is used to determine whether or not there is a statistically significant difference between the medians of three or more independent groups.
+
+H0: the mean ranks of the groups are the same
+
+**Kruskal-Wallis test for RDW:**
+
+```{r}
+kruskal.test(RDW~group,data=rdw_log) 
+  #chi2 3.5677
+  #p-value 0.168 (not significant)
+kruskal.test(RDW~survival_status,data=rdw_log) 
+  #chi2 1.2161
+  #p-value 0.2701 (not significant)
+wilcox.test(RDW~sex,data=rdw_log) 
+  # W=12208
+  #p-value 0.6974 (not significant)
+
+
+kruskal.test(RDW~group,data=rdw_subset_sick) 
+  #chi2 0.41788
+  #p-value 0.518 (not significant)
+wilcox.test(RDW~sex,data=rdw_subset_sick) 
+  #W 6235
+  #p-value 0.3349 (not significant)
+kruskal.test(RDW~survival_status,data=rdw_log) 
+  #chi2 1.2161
+  #p-value 0.2701 (not significant)
+
+
+wilcox.test(RDW~sex,data=rdw_septic_group) 
+  # W=728.5
+  #p-value 0.3349 (not significant)
+kruskal.test(RDW~survival_status,data=rdw_septic_group) 
+  #chi2 0.75883
+  #p-value 0.3837 (not significant)
+
+```
+
+**Kruskal-Wallis test for RPR per categories**
+
+```{r}
+kruskal.test(RPR~group,data=rdw_log) 
+  #chi2 14.703
+  #p-value 0.0006417 (statistically significant)
+wilcox.test(RPR~sex,data=rdw_log) 
+  #W = 9920.5
+  #p-value 0.001393 (statitiscally significant)
+kruskal.test(RPR~survival_status,data=rdw_log) 
+  #chi2 4.9995
+  #p-value 0.02536 (statistically significant)
+
+
+kruskal.test(RPR~group,data=rdw_subset_sick) 
+  #chi2 8.4982
+  #p-value 0.003555 (statistically significant)
+wilcox.test(RPR~sex,data=rdw_subset_sick) 
+  # W=4993
+  #p-value 0.0009401 (statitiscally significant)
+kruskal.test(RPR~survival_status,data=rdw_subset_sick) 
+  #chi2 3.035
+  #p-value 0.08149 (not statistically significant)
+
+
+wilcox.test(RPR~sex,data=rdw_septic_group) 
+  # W=683.5
+  #p-value 0.1677 (not significant)
+kruskal.test(RPR~survival_status,data=rdw_septic_group) 
+  #chi2 0.0017533
+  #p-value 0.9666 (not significant)
+```
+
+### Correlation tests for RDW\~continuous variables
+
+```{r}
+
+#correlation between RDW and days of hospitalization
+cor.test(rdw_log$RDW,rdw_log$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.6813 (not significant)
+  #rho 0.02315623 
+
+#correlation between RDW and age
+cor.test(rdw_log$RDW,rdw_log$age,method=c("spearman"))
+  #p-value 0.6275 (not significant)
+  #rho 0.02744654
+
+#correlation between RDW and sepsis score
+cor.test(rdw_log$RDW,rdw_log$sepsis_score,method=c("spearman"))
+  #p-value 0.3167 (not significant)
+  #rho 0.05641121
+
+
+
+
+#correlation between RDW and days of hospitalization among the sick animals
+cor.test(rdw_subset_sick$RDW,rdw_subset_sick$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.6578 (not significant)
+  #rho -0.02625683 
+
+#correlation between RDW and age among the sick animals
+cor.test(rdw_subset_sick$RDW,rdw_subset_sick$age,method=c("spearman"))
+  #p-value 0.6353 (not significant)
+  #rho 0.03143857 
+
+#correlation between RDW and sepsis score among the sick animals
+cor.test(rdw_subset_sick$RDW,rdw_subset_sick$sepsis_score,method=c("spearman"))
+  #p-value 0.6339 (not significant)
+  #rho -0.0314312
+
+
+#correlation between RDW and days of hospitalization among the septic animals
+cor.test(rdw_septic_group$RDW,rdw_septic_group$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.8758 (not significant)
+  #rho 0.01741893 
+
+#correlation between RDW and age among the septic animals
+cor.test(rdw_septic_group$RDW,rdw_septic_group$age,method=c("spearman"))
+  #p-value 0.6736 (not significant)
+  #rho 0.04721007 
+
+#correlation between RDW and sepsis score among the septic animals
+cor.test(rdw_septic_group$RDW,rdw_septic_group$sepsis_score,method=c("spearman"))
+  #p-value 0.03211 (statistically significant)
+  #rho 0.2354876
+
+
+```
+
+### Correlation tests for RPR\~continuous variables
+
+```{r}
+#correlation between RPR and days of hospitalization
+cor.test(rdw_log$RPR,rdw_log$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.009524 (statistically significant)
+  #rho 0.1454172
+
+#correlation between RPR and age
+cor.test(rdw_log$RPR,rdw_log$age,method=c("spearman"))
+  #p-value 0.0001636 (statistically significant)
+  #rho 0.210829
+
+#correlation between RPR and sepsis score
+cor.test(rdw_log$RPR,rdw_log$sepsis_score,method=c("spearman"))
+  #p-value 0.0001538 (statistically significant)
+  #rho 0.211014
+
+
+
+#correlation between RPR and days of hospitalization among the sick animals
+cor.test(rdw_subset_sick$RPR,rdw_subset_sick$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.03146 (statistically significant)
+  #rho 0.1412877
+
+#correlation between RPR and age among the sick animals
+cor.test(rdw_subset_sick$RPR,rdw_subset_sick$age,method=c("spearman"))
+  #p-value 0.0002652 (statistically significant)
+  #rho 0.238309
+
+#correlation between RPR and sepsis score among the sick animals
+cor.test(rdw_subset_sick$RPR,rdw_subset_sick$sepsis_score,method=c("spearman"))
+  #p-value 0.001241 (statistically significant)
+  #rho 0.2107709
+
+
+#correlation between RPR and days of hospitalization among the septic animals
+cor.test(rdw_septic_group$RPR,rdw_septic_group$days_of_hospitalization,method=c("spearman"))
+  #p-value 0.3538 (not significant)
+  #rho 0.1030722
+
+#correlation between RPR and age among the septic animals
+cor.test(rdw_septic_group$RPR,rdw_septic_group$age,method=c("spearman"))
+  #p-value 0.0008877 (statistically significant)
+  #rho 0.3601889
+
+#correlation between RPR and sepsis score among the septic animals
+cor.test(rdw_septic_group$RPR,rdw_septic_group$sepsis_score,method=c("spearman"))
+  #p-value 0.7791 (not significant)
+  #rho 0.03125007
+
+```
+
+### Correlation tests for sepsis_score\~continuous variables
+
+```{r}
+#correlation between sepsis_score and days of hospitalization
+cor.test(rdw_log$sepsis_score,rdw_log$days_of_hospitalization,method=c("spearman"))
+  #p-value 1.628e-09 (statistically significant)
+  #rho 0.330485
+
+#correlation between sepsis_score and age
+cor.test(rdw_log$sepsis_score,rdw_log$age,method=c("spearman"))
+  #p-value 0.5468 (not significant)
+  #rho 0.03408019
+
+
+```
+
+## Box-plots for significant differences between groups
+
+```{r}
+##### BOX PLOTS FOR RPR #####
+
+### RPR AMONG ALL ###
+#box plot RPR by group
+rdw_log$group <- factor(rdw_log$group, levels=c('Healthy','SNS','Septic'))
+
+boxplot(rdw_log$RPR~rdw_log$group, outline=FALSE, xlab='Group', ylab='RPR', main='RPR by group among all', col='darkgreen')
+  
+
+#box plot RPR by sex
+boxplot(rdw_log$RPR~rdw_log$sex, outline=FALSE, xlab='Sex', ylab='RPR',main='RPR by sex among all', col='yellow',names=c('Female','Male'))
+
+
+# box plot RPR by survival status
+rdw_log$survival_status <- factor(rdw_log$survival_status, levels=c('Survivor','Non-Survivor'))
+
+boxplot(rdw_log$RPR~rdw_log$survival_status, outline=FALSE, xlab='Discharge status', ylab='RPR', main='RPR by survival status among all', col='steelblue')
+
+### RPR AMONG SICK ###
+#box plot RPR by group among sick
+boxplot(rdw_subset_sick$RPR~rdw_subset_sick$group, outline=FALSE, xlab='Group', ylab='RPR', main='RPR by group among sick', col='darkgreen')
+
+#box plot RPR by sex among sick
+boxplot(rdw_subset_sick$RPR~rdw_subset_sick$sex, outline=FALSE, xlab='Sex', ylab='RPR', main='RPR by sex among sick', col='yellow')
+  
+
+
+```
+
+```{r}
+par(mfcol=c(1,3))
+#box plot RPR by group
+boxplot(rdw_log$RPR~rdw_log$group, outline=FALSE, xlab='Group', ylab='RPR', main='RPR by group', names = c('Healthy (n = 85)', 'SNS (n = 149)', ' Septic (n = 83)'))
+
+#box plot RPR by sex
+boxplot(rdw_log$RPR~rdw_log$sex, outline=FALSE, xlab='Sex', ylab='RPR', main='RPR by sex',names=c('Female (n = 150)','Male (n = 167)'))
+
+# box plot RPR by survival status
+boxplot(rdw_log$RPR~rdw_log$survival_status, outline=FALSE, xlab='Discharge status', ylab='RPR', main='RPR by survival status',names=c('Survivor (n = 278)','Non-Survivor (n = 39)'))
+```
+
+## Scatter-plots
+
+```{r}
+### PLOT AMONG ALL ###
+par(mfcol=c(4,2))
+
+#scatter plot RPR x age with color for survival_status and shape for group
+ggplot(rdw_log, aes(x = age, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  ylim(0,0.4)
+
+
+#scatter plot RPR x days_of_hospitalization with color for survival_status and shape for group
+ggplot(rdw_log, aes(x = days_of_hospitalization, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  xlim(0,44)+
+  ylim(0,0.4)
+
+#scatter plot RPR x sepsis score with color for survival_status and shape for group
+ggplot(rdw_log, aes(x = sepsis_score, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  ylim(0,0.4)
+
+
+### PLOTS AMONG SICK ###
+
+#scatter plot RPR x age with color for survival_status and shape for group
+ggplot(rdw_subset_sick, aes(x = age, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  ylim(0,0.4)
+
+#scatter plot RPR x days_of_hospitalization with color for survival_status and shape for group
+ggplot(rdw_subset_sick, aes(x = days_of_hospitalization, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  xlim(0,44)+
+  ylim(0,0.4)
+
+#scatter plot RPR x sepsis score with color for survival_status and shape for group
+ggplot(rdw_subset_sick, aes(x = sepsis_score, y = RPR)) +
+  geom_point(aes(color=survival_status,shape=group),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  ylim(0,0.4)
+
+
+
+### PLOTS AMONG SEPTIC ###
+
+#scatter plot RPR x age with color for survival_status 
+ggplot(rdw_septic_group, aes(x = sepsis_score, y = RPR)) +
+  geom_point(aes(color=survival_status),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)+
+  ylim(0,0.4)
+
+#scatter plot RDW x sepsis_score with color for survival_status
+ggplot(rdw_septic_group, aes(x = sepsis_score, y = RDW)) +
+  geom_point(aes(color=survival_status),position = position_jitter(width=0.3))+
+  stat_smooth(method='glm',se=TRUE)
+```
+
+# Model building
+
+## Missing data
+
+Checking for missing data for each possible covariate
+
+```{r}
+for(i in names(rdw_log)){
+print (c(i, sum(is.na((rdw_log[i])))))}
+```
+
+## Correlation between variables
+
+Plotting the correlation between variables (numeric and categorical)
+
+```{r}
+head(rdw_log)
+```
+
+```{r}
+correlation_plot  <- plot(rdw_log[c(6,12,28:34,36,46,50,52:56,59:61,64)])
+
+correlation_plot
+```
+
+Finding which quantitative variables (covariates) are highly correlated with each:
+
+```{r}
+covariates = names(rdw_log)[(names(rdw_log) %in% c('days_of_hospitalization','age','RBC','Hg','HCT','MCV','MCH','MCHC','RDW','WBC','neut','lymph','mono','eos','baso','platelets','TPP','fib','RPR','creatinine'))]
+
+covariates
+```
+
+```{r}
+cor(rdw_log[,covariates])
+```
+
+Correlation matrix:
+
+```{r}
+cormat <- round(cor(drop_na(rdw_log[,covariates])),2)
+
+cormat
+```
+
+Plotting the correlation matrix:
+
+```{r}
+melted_cormat <- melt(cormat)
+head(melted_cormat)
+```
+
+```{r}
+ggplot(data=melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()
+```
+
+Making the plot above more readable:
+
+```{r}
+# reordering the correlation matrix
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
+cormat <- reorder_cormat(cormat)
+
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+## remove the upper half of the matrix
+upper_tri <- get_upper_tri(cormat)
+
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+# Creating a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))+
+  coord_fixed()
+
+# Printing the heatmap
+ggheatmap + 
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+```
+
+We will keep a close eye on covariates that have correlation coefficient higher than 70%
+
+We decided to drop Hg, RBC, **MCV, MCH** (highly correlated) - let's return to this after univariate analysis
+
+## Single main effect plots
+
+### Among all animals (healthy, SNS and septic)
+
+```{r}
+variables = names(rdw_log)[(names(rdw_log) %in% c('days_of_hospitalization','discharge_status','patient_breed','sex','age','group','HCT','MCHC','RDW','anisocytosis','WBC','neut','lymph','mono','eos','baso','platelets','TPP','fib','RPR','creatinine'))]
+
+rdw_log$surv = factor(rdw_log$survival_status)
+
+getBetaAndSe <- function(covar){
+  coefs <- glm(surv~scale(rdw_log[[covar]]),data=rdw_log,family='binomial') %>% 
+    summary() %>% coef()
+  data.frame(variable = covar, 
+             estimate = coefs[2,1], 
+             se = coefs[2,2], 
+             p = coefs[2,4])
+}
+
+beta.table <- adply(t(covariates), 2, getBetaAndSe) %>% 
+  arrange(estimate) %>% 
+  mutate(low = estimate - 2*se, 
+         high = estimate + 2*se,
+         variable = reorder(variable, order(estimate)))
+
+ggplot(beta.table, aes(y=estimate, x=variable, ymin=low, ymax=high, color = (p < 0.05))) + 
+  geom_pointrange() +  
+  geom_hline(yintercept = 0, col="darkgrey", lty = 3, lwd=2) + 
+  coord_flip() + theme_few() + ggtitle("Single main effect plot")
+
+head(rdw_log)
+```
+
+### Among septic animals
+
+```{r}
+variables = names(rdw_septic_group)[(names(rdw_septic_group) %in% c('days_of_hospitalization','discharge_status','patient_breed','sex','age','group','HCT','MCHC','RDW','anisocytosis','WBC','neut','lymph','mono','eos','baso','platelets','TPP','fib','RPR','creatinine'))]
+
+rdw_septic_group$surv = factor(rdw_septic_group$survival_status)
+
+getBetaAndSe <- function(covar){
+  coefs <- glm(surv~scale(rdw_septic_group[[covar]]),data=rdw_septic_group,family='binomial') %>% 
+    summary() %>% coef()
+  data.frame(variable = covar, 
+             estimate = coefs[2,1], 
+             se = coefs[2,2], 
+             p = coefs[2,4])
+}
+
+beta.table <- adply(t(covariates), 2, getBetaAndSe) %>% 
+  arrange(estimate) %>% 
+  mutate(low = estimate - 2*se, 
+         high = estimate + 2*se,
+         variable = reorder(variable, order(estimate)))
+
+ggplot(beta.table, aes(y=estimate, x=variable, ymin=low, ymax=high, color = (p < 0.05))) + 
+  geom_pointrange() +  
+  geom_hline(yintercept = 0, col="darkgrey", lty = 3, lwd=2) + 
+  coord_flip() + theme_few() + ggtitle("Single main effect plot")
+
+head(rdw_septic_group)
+```
+
+### Among sick animals (SNS and septic)
+
+```{r}
+variables = names(rdw_subset_sick)[(names(rdw_subset_sick) %in% c('days_of_hospitalization','discharge_status','patient_breed','sex','age','group','HCT','MCHC','RDW','anisocytosis','WBC','neut','lymph','mono','eos','baso','platelets','TPP','fib','RPR','creatinine'))]
+
+rdw_subset_sick$surv = factor(rdw_subset_sick$survival_status)
+
+getBetaAndSe <- function(covar){
+  coefs <- glm(surv~scale(rdw_subset_sick[[covar]]),data=rdw_subset_sick,family='binomial') %>% 
+    summary() %>% coef()
+  data.frame(variable = covar, 
+             estimate = coefs[2,1], 
+             se = coefs[2,2], 
+             p = coefs[2,4])
+}
+
+beta.table <- adply(t(covariates), 2, getBetaAndSe) %>% 
+  arrange(estimate) %>% 
+  mutate(low = estimate - 2*se, 
+         high = estimate + 2*se,
+         variable = reorder(variable, order(estimate)))
+
+ggplot(beta.table, aes(y=estimate, x=variable, ymin=low, ymax=high, color = (p < 0.05))) + 
+  geom_pointrange() +  
+  geom_hline(yintercept = 0, col="darkgrey", lty = 3, lwd=2) + 
+  coord_flip() + theme_few() + ggtitle("Single main effect plot")
+
+head(rdw_subset_sick)
+```
+
+## Univariate analysis
+
+### Among all \~ survival_status (survivor and non-survivor)
+
+Run univariate correlation analysis for each possible covariate:
+
+```{r}
+rdw_log <- rdw_log %>%
+  mutate (surv = ifelse(survival_status=='Survivor',1,0)) %>%
+  mutate (surv = as.factor(surv))
+# 1 means survival
+# 0 means non-survival
+
+
+fit.0 <- glm(surv~days_of_hospitalization, data = rdw_log, family = binomial(link=logit))
+summary(fit.0)
+#p-value 0.0249, estimate 0.11408
+
+fit.1 <- glm(surv~discharge_status, data = rdw_log, family = binomial(link=logit))
+summary(fit.1)
+#this is garbage
+
+fit.2 <- glm(surv~patient_breed, data = rdw_log, family = binomial(link=logit))
+summary(fit.2)
+#this is also garbage
+
+fit.3 <- glm(surv~sex, data = rdw_log, family = binomial(link=logit))
+summary(fit.3)
+#females p-value 3.69e-15, estimate 1.93076
+
+fit.4 <- glm(surv~age, data = rdw_log, family = binomial(link=logit))
+summary(fit.4)
+#garbage
+
+fit.5 <- glm(surv~group, data = rdw_log, family = binomial(link=logit))
+summary(fit.5)
+#garbage
+
+fit.6 <- glm(surv~HCT, data = rdw_log, family = binomial(link=logit))
+summary(fit.6)
+#garbage
+
+fit.7 <- glm(surv~MCHC, data = rdw_log, family = binomial(link=logit))
+summary(fit.7)
+#p-value 0.0108, estimate 0.2653 
+
+fit.8 <- glm(surv~RDW, data = rdw_log, family = binomial(link=logit))
+summary(fit.8)
+#nope
+
+fit.9 <- glm(surv~anisocytosis, data = rdw_log, family = binomial(link=logit))
+summary(fit.9)
+#garbage
+
+fit.10 <- glm(surv~WBC, data = rdw_log, family = binomial(link=logit))
+summary(fit.10)
+#crap
+
+fit.11 <- glm(surv~neut, data = rdw_log, family = binomial(link=logit))
+summary(fit.11)
+#p-value 0.00458, estimate 1.757e-04
+
+fit.12 <- glm(surv~lymph, data = rdw_log, family = binomial(link=logit))
+summary(fit.12)
+#poop
+
+fit.13 <- glm(surv~mono, data = rdw_log, family = binomial(link=logit))
+summary(fit.13)
+#coco
+
+fit.14 <- glm(surv~eos, data = rdw_log, family = binomial(link=logit))
+summary(fit.14)
+#nope
+
+fit.15 <- glm(surv~baso, data = rdw_log, family = binomial(link=logit))
+summary(fit.15)
+#p value 0.0213, estimate 0.03647
+
+fit.16 <- glm(surv~platelets, data = rdw_log, family = binomial(link=logit))
+summary(fit.16)
+#nope
+
+fit.17 <- glm(surv~TPP, data = rdw_log, family = binomial(link=logit))
+summary(fit.17)
+#nope
+
+fit.18 <- glm(surv~fib, data = rdw_log, family = binomial(link=logit))
+summary(fit.18)
+#p-value 0.000574, estimate -0.004173
+
+fit.19 <- glm(surv~RPR, data = rdw_log, family = binomial(link=logit))
+summary(fit.19)
+#NO )))):
+
+fit.20 <- glm(surv~creatinine, data = rdw_log, family = binomial(link=logit))
+summary(fit.20)
+#p-value 0.0324, estimate -0.09903
+```
+
+### Among sick \~ survival_status (survivor and non-survivor)
+
+```{r}
+rdw_subset_sick <- rdw_subset_sick %>%
+  mutate (surv = ifelse(survival_status=='Survivor',1,0)) %>%
+  mutate (surv = as.factor(surv))
+
+fit.21 <- glm(surv~days_of_hospitalization, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.21)
+#p-value 0.00152, estimate 0.19165
+
+fit.22 <- glm(surv~discharge_status, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.22)
+#trash
+
+fit.23 <- glm(surv~patient_breed, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.23)
+#trash
+
+fit.24 <- glm(surv~sex, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.24)
+#p-value female 1.88e-09, estimate 1.5215
+
+fit.25 <- glm(surv~age, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.25)
+#nope
+
+fit.26 <- glm(surv~group, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.26)
+#p-value SNS 5.79e-09, estimate 2.7556
+#p-value septic 0.0639, estimate 0.4155
+
+fit.27 <- glm(surv~HCT, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.27)
+#nope
+
+fit.28 <- glm(surv~MCHC, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.28)
+#p-value 0.0119, estimate 0.2564
+
+fit.29 <- glm(surv~RDW, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.29)
+#nope )))):
+
+fit.30 <- glm(surv~anisocytosis, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.30)
+#nope
+
+fit.31 <- glm(surv~WBC, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.31)
+#nope
+
+fit.32 <- glm(surv~neut, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.32)
+#p-value 0.03326, estimate 1.226e-04
+
+fit.33 <- glm(surv~lymph, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.33)
+#nope
+
+fit.34 <- glm(surv~mono, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.34)
+#nope
+
+fit.35 <- glm(surv~eos, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.35)
+#nope
+
+fit.36 <- glm(surv~baso, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.36)
+#p-value 0.0498, estimate 0.03007
+
+fit.37 <- glm(surv~platelets, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.37)
+#nope
+
+fit.38 <- glm(surv~TPP, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.38)
+#caca
+
+fit.39 <- glm(surv~fib, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.39)
+#p-value 0.012, estimate -0.002960
+
+fit.40 <- glm(surv~RPR, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.40)
+#noooooooooo )))):
+
+fit.41 <- glm(surv~creatinine, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.41)
+#p-value 0.0734, estimate -0.08636 
+```
+
+### Among septic \~ survival_status (survivor and non-survivor)
+
+```{r}
+rdw_septic_group <- rdw_septic_group %>%
+  mutate (surv = ifelse(survival_status=='Survivor',1,0)) %>%
+  mutate (surv = as.factor(surv))
+
+fit.42 <- glm(surv~days_of_hospitalization, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.42)
+#p-value 0.000362, estimate 0.24091
+
+fit.43 <- glm(surv~discharge_status, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.43)
+#nope
+
+fit.44 <- glm(surv~patient_breed, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.44)
+#nope
+
+fit.45 <- glm(surv~sex, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.45)
+#nope
+
+fit.46 <- glm(surv~age, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.46)
+#no
+
+fit.47 <- glm(surv~HCT, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.47)
+#no
+
+fit.48 <- glm(surv~MCHC, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.48)
+#estimate 0.2632, p value 0.0355
+
+fit.49 <- glm(surv~RDW, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.49)
+#nope 
+
+fit.50 <- glm(surv~anisocytosis, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.50)
+#nope
+
+fit.51 <- glm(surv~WBC, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.51)
+#nope
+
+fit.52 <- glm(surv~neut, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.52)
+#nope
+
+fit.53 <- glm(surv~lymph, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.53)
+#nope
+
+fit.54 <- glm(surv~mono, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.54)
+#nope
+
+fit.55 <- glm(surv~eos, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.55)
+#nope
+
+fit.56 <- glm(surv~baso, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.56)
+#nope
+
+fit.57 <- glm(surv~platelets, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.57)
+#nope
+
+fit.58 <- glm(surv~TPP, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.58)
+#nope
+
+fit.59 <- glm(surv~fib, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.59)
+#nope
+
+fit.60 <- glm(surv~RPR, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.60)
+#nope
+
+fit.61 <- glm(surv~creatinine, data = rdw_septic_group, family = binomial(link=logit))
+summary(fit.61)
+#nope
+
+```
+
+### Among the ones that had blood culture done \~ survival
+
+```{r}
+rdw_blood_culture_done <- rdw_log %>%
+  filter(blood_culture_done==1)%>%
+  mutate (sepsis = ifelse(blood_culture_result=='1',1,0)) %>%
+  mutate (sepsis = as.factor(sepsis))%>%
+  mutate (surv = ifelse(survival_status=='Survivor',1,0)) %>%
+  mutate (surv = as.factor(surv))
+
+fit.62 <- glm(surv~days_of_hospitalization, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.62)
+#p-value 0.00258, estimate 0.23610
+
+fit.63 <- glm(surv~discharge_status, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.63)
+#no
+
+fit.64 <- glm(surv~patient_breed, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.64)
+#no
+
+fit.65 <- glm(surv~sex, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.65)
+#p-value female 0.00442, estimate 1.0033
+
+fit.66 <- glm(surv~age, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.66)
+#no
+
+fit.67 <- glm(surv~HCT, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.67)
+#no
+
+fit.68 <- glm(surv~MCHC, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.68)
+#no
+
+fit.69 <- glm(surv~RDW, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.69)
+#nope ))):
+
+fit.70 <- glm(surv~anisocytosis, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.70)
+#no
+
+fit.71 <- glm(surv~WBC, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.71)
+#no
+
+fit.72 <- glm(surv~neut, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.72)
+#no
+
+fit.73 <- glm(surv~lymph, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.73)
+#no
+
+fit.74 <- glm(surv~mono, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.74)
+#no
+
+fit.75 <- glm(surv~eos, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.75)
+#no
+
+fit.76 <- glm(surv~baso, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.76)
+#no
+
+fit.77 <- glm(surv~platelets, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.77)
+#no
+
+fit.78 <- glm(surv~TPP, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.78)
+#no
+
+fit.79 <- glm(surv~fib, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.79)
+#p-value 0.039306, estimate -0.003185
+
+fit.80 <- glm(surv~RPR, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.80)
+#p-value 0.079790
+# estimate -7.9501
+
+fit.81 <- glm(surv~creatinine, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.81)
+#no
+
+```
+
+### Among the ones that had blood culture done \~ sepsis (1=positive or 0=negative)
+
+```{r}
+rdw_blood_culture_done <- rdw_log %>%
+  filter(blood_culture_done==1)%>%
+  mutate (sepsis = ifelse(blood_culture_result=='1',1,0)) %>%
+  mutate (sepsis = as.factor(sepsis))
+
+fit.82 <- glm(sepsis~days_of_hospitalization, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.82)
+#no
+
+fit.83 <- glm(sepsis~discharge_status, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.83)
+#ALIVE: p value 4.86e-06, estimate -1.3683
+#EUTH: p value 0.00573, estimate 1.6196
+
+fit.84 <- glm(sepsis~patient_breed, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.84)
+#no
+
+#rdw_blood_culture_done$sex <- relevel(rdw_blood_culture_done$sex, ref = "M")
+
+fit.85 <- glm(sepsis~sex, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.85)
+#females: p value 0.000774, estimate -1.2685
+
+fit.86 <- glm(sepsis~age, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.86)
+#no
+
+fit.87 <- glm(sepsis~HCT, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.87)
+#no
+
+fit.88 <- glm(sepsis~MCHC, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.88)
+#no
+
+fit.89 <- glm(sepsis~RDW, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.89)
+#nope ))):
+
+fit.90 <- glm(sepsis~anisocytosis, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.90)
+#no
+
+fit.91 <- glm(sepsis~WBC, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.91)
+#p value 0.031, estimate -0.0001620
+
+fit.92 <- glm(sepsis~neut, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.92)
+#p value 0.00547, estimate  -2.435e-04
+
+fit.93 <- glm(sepsis~lymph, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.93)
+#no
+
+fit.94 <- glm(sepsis~mono, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.94)
+#no
+
+fit.95 <- glm(sepsis~eos, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.95)
+#no
+
+fit.96 <- glm(sepsis~baso, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.96)
+#no
+
+fit.97 <- glm(sepsis~platelets, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.97)
+#no
+
+fit.98 <- glm(sepsis~TPP, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.98)
+#no
+
+fit.99 <- glm(sepsis~fib, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.99)
+#no
+
+fit.100 <- glm(sepsis~RPR, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.100)
+#no )))):
+
+fit.101 <- glm(sepsis~creatinine, data = rdw_blood_culture_done, family = binomial(link=logit))
+summary(fit.101)
+#no
+
+```
+
+### Among all \~ sepsis (1=positive or 0=negative)
+
+```{r}
+rdw_all <- rdw_raw %>%
+  mutate (sepsis = ifelse(group=='Septic',1,0)) %>%
+  mutate (sepsis = as.factor(sepsis))
+
+
+fit.102 <- glm(sepsis~days_of_hospitalization, data = rdw_all, family = binomial(link=logit))
+summary(fit.102)
+#estimate 0.04466, p value 0.0154
+
+fit.103 <- glm(sepsis~discharge_status, data = rdw_all, family = binomial(link=logit))
+summary(fit.103)
+#alive estimate -1.5173, p value < 2e-16
+#died estimate 2.6159, p value 0.00165
+#euth estimate 3.4269, p value 8.21e-10
+
+fit.104 <- glm(sepsis~patient_breed, data = rdw_all, family = binomial(link=logit))
+summary(fit.104)
+#no
+
+fit.105 <- glm(sepsis~sex, data = rdw_all, family = binomial(link=logit))
+summary(fit.105)
+#female estimate -1.2272, p value 3.12e-10
+
+fit.106 <- glm(sepsis~age, data = rdw_all, family = binomial(link=logit))
+summary(fit.106)
+#no
+
+fit.107 <- glm(sepsis~HCT, data = rdw_all, family = binomial(link=logit))
+summary(fit.107)
+#no
+
+fit.108 <- glm(sepsis~MCHC, data = rdw_all, family = binomial(link=logit))
+summary(fit.108)
+#no
+
+fit.109 <- glm(sepsis~RDW, data = rdw_all, family = binomial(link=logit))
+summary(fit.109)
+#no
+#estimate 0.004695, p value 0.974
+
+fit.110 <- glm(sepsis~anisocytosis, data = rdw_all, family = binomial(link=logit))
+summary(fit.110)
+#no
+
+fit.111 <- glm(sepsis~WBC, data = rdw_all, family = binomial(link=logit))
+summary(fit.111)
+# estimate -1.885e-04, p value 3.39e-05
+
+fit.112 <- glm(sepsis~neut, data = rdw_all, family = binomial(link=logit))
+summary(fit.112)
+# estimate -2.521e-04, p value 5e-07
+
+fit.113 <- glm(sepsis~lymph, data = rdw_all, family = binomial(link=logit))
+summary(fit.113)
+#estimate -0.0004911, p value 0.0454
+
+fit.114 <- glm(sepsis~mono, data = rdw_all, family = binomial(link=logit))
+summary(fit.114)
+#estimate 0.0014373, p value 0.0111
+
+fit.115 <- glm(sepsis~eos, data = rdw_all, family = binomial(link=logit))
+summary(fit.115)
+#no
+
+fit.116 <- glm(sepsis~baso, data = rdw_all, family = binomial(link=logit))
+summary(fit.116)
+#estimate -0.05518, p value 2.33e-05
+
+fit.117 <- glm(sepsis~platelets, data = rdw_all, family = binomial(link=logit))
+summary(fit.117)
+#estimate -0.006904, p value 0.00141
+
+fit.118 <- glm(sepsis~TPP, data = rdw_all, family = binomial(link=logit))
+summary(fit.118)
+#no
+
+fit.119 <- glm(sepsis~fib, data = rdw_all, family = binomial(link=logit))
+summary(fit.119)
+#estimate 0.004616, p value 2.91e-05
+
+fit.120 <- glm(sepsis~RPR, data = rdw_all, family = binomial(link=logit))
+summary(fit.120)
+#estimate 12.6758, p value 0.000258
+
+fit.121 <- glm(sepsis~creatinine, data = rdw_all, family = binomial(link=logit))
+summary(fit.121)
+#estimate 0.33784, p value 0.000177
+```
+
+### Among the sick \~ sepsis (1=positive or 0=negative)
+
+```{r}
+
+rdw_subset_sick <- rdw_subset_sick %>%
+  mutate (sepsis = ifelse(group=='Septic',1,0)) %>%
+  mutate (sepsis = as.factor(sepsis))
+
+fit.122 <- glm(sepsis~days_of_hospitalization, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.122)
+#no
+
+fit.123 <- glm(sepsis~discharge_status, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.123)
+#alive estimate -1.0508 , p value .60e-10
+#died estimate 2.1494, p value 0.00986
+#euth estimate 2.9604, p value 1.27e-07
+
+fit.124 <- glm(sepsis~patient_breed, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.124)
+#no
+
+fit.125 <- glm(sepsis~sex, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.125)
+#female estimate -0.7503, p value 0.000311
+
+fit.126 <- glm(sepsis~age, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.126)
+#no
+
+fit.127 <- glm(sepsis~HCT, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.127)
+#no
+
+fit.128 <- glm(sepsis~MCHC, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.128)
+#no
+
+fit.129 <- glm(sepsis~RDW, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.129)
+#no
+#estimate -0.07826, p value 0.605
+
+fit.120 <- glm(sepsis~anisocytosis, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.120)
+#no
+
+fit.131 <- glm(sepsis~WBC, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.131)
+# estimate  -1.373e-04, p value 0.00143
+
+fit.132 <- glm(sepsis~neut, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.132)
+# estimate -1.936e-04, p value 5.68e-05
+
+fit.133 <- glm(sepsis~lymph, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.133)
+#no 
+
+fit.134 <- glm(sepsis~mono, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.134)
+#estimate 0.0013030, p value 0.0352
+
+fit.135 <- glm(sepsis~eos, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.135)
+#no
+
+fit.136 <- glm(sepsis~baso, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.136)
+#estimate -0.04973, p value 0.000117
+
+fit.137 <- glm(sepsis~platelets, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.137)
+#estimate -0.005284, p value 0.0145
+
+fit.138 <- glm(sepsis~TPP, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.138)
+#no
+
+fit.139 <- glm(sepsis~fib, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.139)
+#estimate 0.002892, p value 0.00719
+
+fit.140 <- glm(sepsis~RPR, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.140)
+#estimate 9.5720, p value 0.00535
+
+fit.141 <- glm(sepsis~creatinine, data = rdw_subset_sick, family = binomial(link=logit))
+summary(fit.141)
+#estimate 0.27167, p value 0.00118
+```
+
+## Trying some models
+
+### Survival within all
+
+```{r}
+model1.1 <- glm(surv~MCHC+RDW+neut+baso+fib+RPR+creatinine, data = rdw_log, family = binomial(link=logit))
+
+model1.2 <- glm(surv~RPR+MCHC+neut+baso+fib+creatinine, data = rdw_log, family = binomial(link=logit))
+stepAIC(model1.1)
+
+lroc(model1.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+lroc(model1.2,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+lroc(model1.3,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+#the best model here was model1.1
+```
+
+```{r}
+glm_out_1.1 <- glm(formula = sepsis ~ RPR, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='RPR')
+
+glm_out_rpr %>%
+  roc_curve(event_level = 'second', truth = sepsis, .fitted)%>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity))+
+  geom_line(size = 1.1,color='red') +
+  geom_abline(slope = 1, intercept = 0, size = 0.4) +
+  coord_fixed() +
+  theme_cowplot()
+
+glm_out_rpr %>%
+  roc_auc(event_level = 'second', truth = sepsis, .fitted)
+
+```
+
+### Survival within sick
+
+```{r}
+model2.1 <- glm(formula = surv ~ MCHC + RDW + neut + baso + fib + RPR, family = binomial(link = logit), data = rdw_subset_sick)
+
+summary(model2.1)
+
+lroc(model2.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+stepAIC(model2.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+model2.2 <- glm(formula = surv ~ MCHC + RPR + neut + baso + fib, family = binomial(link = logit), data = rdw_subset_sick)
+
+lroc(model2.2,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Survival within septic
+
+```{r}
+model3.1 <- glm(formula = surv ~ MCHC+RPR+RDW, family = binomial(link = logit), data = rdw_septic_group)
+
+summary(model3.1)
+
+stepAIC(model3.1)
+
+lroc(model3.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+model3.2 <- glm(formula = surv ~ MCHC, family = binomial(link = logit), data = rdw_septic_group)
+
+lroc(model3.2,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+```
+
+### Survival within the ones that had blood culture done
+
+```{r}
+model3 <- glm(formula = sepsis ~ days_of_hospitalization+sex+RDW+fib+RPR, family = binomial(link = logit), data = rdw_blood_culture_done)
+
+summary(model3)
+
+```
+
+### Sepsis within the ones that had blood culture done
+
+```{r}
+model4.1<- glm(formula = sepsis ~ RPR +  RDW + WBC + neut, family = binomial(link = logit), data = rdw_blood_culture_done)
+
+summary(model4.1)
+
+lroc(model4.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+
+model4.2 <- glm(formula = sepsis ~ WBC + neut, family = binomial(link = logit), data = rdw_blood_culture_done)
+
+summary(model4.2)
+
+lroc(model4.2,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Sepsis within septic group
+
+```{r}
+model5.1 <- glm(formula = sepsis ~ RPR +  RDW + WBC + neut, family = binomial(link = logit), data = rdw_blood_culture_done)
+
+summary(model5.1)
+
+lroc(model5.1,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+
+model5.2 <- glm(formula = sepsis ~ WBC + neut, family = binomial(link = logit), data = rdw_blood_culture_done)
+
+summary(model5.2)
+
+lroc(model5.2,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Sepsis within all
+
+```{r}
+model6<- glm(formula = sepsis ~ RPR + WBC + neut + lymph + mono + baso + platelets + creatinine, family = binomial(link = logit), data = rdw_all)
+
+summary(model6)
+
+lroc(model6,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+stepAIC(model6)
+
+best.model <- glm(formula = sepsis ~ RPR + WBC + neut + mono + baso + creatinine, family = binomial(link = logit), data = rdw_all)
+
+summary(best.model)
+
+lroc(best.model,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+```
+
+## Univariate ROCs
+
+### RPR
+
+```{r}
+rdw_all <- rdw_all%>%
+  mutate(sepsis2=as.factor(sepsis))
+
+model.rpr <- glm(formula = sepsis ~ RPR, family = binomial(link = logit), data = rdw_all)
+
+lroc.rpr <- lroc(model.rpr,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+#rocobj <- roc(rdw_all$sepsis2,rdw_all$RPR)
+
+#roc.info <- roc(rdw_all$sepsis2, model.rpr$fitted.values,legacy.axes=TRUE)
+
+
+#plot(x=rdw_all$RPR,y=rdw_all$sepsis)
+#model.rpr <- glm(formula = sepsis ~ RPR, family = binomial(link = logit), data = rdw_all)
+#lines(rdw_all$sepsis,model.rpr$fitted.values)
+
+```
+
+```{r}
+glm_out_rpr <- glm(formula = sepsis ~ RPR, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='RPR')
+
+glm_out_rpr %>%
+  roc_curve(event_level = 'second', truth = sepsis, .fitted)%>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity))+
+  geom_line(size = 1.1,color='red') +
+  geom_abline(slope = 1, intercept = 0, size = 0.4) +
+  coord_fixed() +
+  theme_cowplot() # + 
+  #geom_smooth()
+
+glm_out_rpr %>%
+  roc_auc(event_level = 'second', truth = sepsis, .fitted)
+
+library(cutpointr)
+
+cp <- cutpointr(rdw_all,RPR, sepsis, method = maximize_metric, metric = youden)
+summary(cp)
+```
+
+### WBC
+
+```{r}
+model.wbc <- glm(formula = sepsis ~ WBC, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.wbc,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Neutrophils
+
+```{r}
+model.neut <- glm(formula = sepsis ~ neut, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.neut,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Lymphocytes
+
+```{r}
+model.lymph <- glm(formula = sepsis ~ lymph, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.lymph,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Monocytes
+
+```{r}
+model.mono <- glm(formula = sepsis ~ mono, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.mono,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Basophils
+
+```{r}
+model.baso <- glm(formula = sepsis ~ baso, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.baso,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+```
+
+### Creatinine
+
+```{r}
+model.creatinine <- glm(formula = sepsis ~ creatinine, family = binomial(link = logit), data = rdw_all)
+
+lroc(model.creatinine,grid=FALSE,line.col = "red",auc.coords=c(.25,.1))
+
+lroc7<-lroc(model.creatinine, cex=0.8,grid=FALSE,percent=TRUE, line.col="grey", lty=1,lwd=1.3)$auc
+
+```
+
+```{r}
+lroc(best.model,cex=0.8,line.col="red",grid=FALSE, lwd=0.8)$auc
+lroc1<-lroc(model.rpr, add=TRUE,cex=0.8,grid=FALSE,line.col="black", lty=1,lwd=1.3)$auc
+lroc2<-lroc(model.wbc, add=TRUE,cex=0.8,grid=FALSE,line.col="blue", lty=1,lwd=1.3)$auc
+lroc3<-lroc(model.neut, add=TRUE,cex=0.8,grid=FALSE,line.col="darkgreen", lty=1,lwd=1.3)$auc
+lroc4<-lroc(model.lymph, add=TRUE,cex=0.8,grid=FALSE,line.col="orange", lty=1,lwd=1.3)$auc
+lroc5<-lroc(model.mono, add=TRUE,cex=0.8,grid=FALSE, line.col="purple", lty=1,lwd=1.3)$auc
+lroc6<-lroc(model.baso, add=TRUE,cex=0.8,grid=FALSE, line.col="grey", lty=1,lwd=1.3)$auc
+lroc7<-lroc(model.creatinine, add=TRUE,cex=0.8,grid=FALSE,  line.col="pink", lty=1,lwd=1.3)$auc
+
+```
+
+# Overall ROC curve
+
+```{r}
+glm_out1 <- glm(formula = sepsis ~ RPR, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='RPR (AUC = 63.2%)')
+
+glm_out2 <- glm(formula = sepsis ~ WBC, family = binomial(link = logit), data = rdw_all)%>%
+  augment()%>%
+  mutate(model='WBC (AUC = 70.1%)')
+
+glm_out3 <- glm(formula = sepsis ~ neut, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Neutrophils (AUC = 73.4%)')
+
+glm_out4 <- glm(formula = sepsis ~ lymph, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Lymphocytes (AUC = 62.8%)')
+
+glm_out5 <- glm(formula = sepsis ~ mono, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Monocytes (AUC = 55.5%)') 
+
+glm_out6 <- glm(formula = sepsis ~ baso, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Basophils (AUC = 75.2%)')
+
+glm_out7 <- glm(formula = sepsis ~ creatinine, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Creatinine (AUC = 66%)')
+
+glm_out8 <- glm(formula = sepsis ~ RPR + WBC + neut + lymph + mono + baso + platelets + creatinine, family = binomial(link = logit), data = rdw_all)%>%
+  augment() %>%
+  mutate(model='Final model (AUC = 82.1%)')
+
+glm_out <- bind_rows (glm_out1,glm_out2,glm_out3,glm_out4,glm_out5,glm_out6, glm_out7,glm_out8)
+
+glm_out %>%
+  group_by(model)%>%
+  roc_curve(event_level = 'second', truth = sepsis,.fitted)%>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = model))+
+  geom_line(size = 1.3) +
+  geom_abline(slope = 1.5, intercept = 0, size = 0.4) +
+  coord_fixed() +
+  theme_cowplot()+
+  scale_fill_discrete(breaks=c('final_model','baso','neut','WBC','creatinine','RPR','lymph','mono' ))
+```
+
+# Survival analysis
+
+```{r}
+rdw_log <- rdw_log %>%
+  mutate (death = ifelse(survival_status == 'Survivor',0,1)) %>%
+  mutate (death = as.numeric(death))
+
+rdw_surv <- rdw_log %>%
+  filter(!patient_number %in% c('687982','698921','838471'))
+
+surv_1 = Surv(rdw_surv$days_of_hospitalization, rdw_surv$death)
+
+KMfit = survfit(surv_1 ~ group, data = rdw_surv, stype=1, ctype=1)
+KMfit
+
+summary(KMfit)
+
+```
+
+```{r}
+plot(KMfit, mark.time=TRUE, xlab='Survival time (in days)', ylab='Survival by group',ylim=c(0.4,1), conf.int=FALSE, col=c('green','red','blue'), cex=0.3)
+legend("bottomright",1,c('Healthy','SNS','Septic'), col=c('green','blue','red'),lty=1) 
+
+
+surv_diff <- survdiff(Surv(days_of_hospitalization, death) ~ group, data = rdw_surv)
+
+surv_diff
+```
+
+```{r}
+rdw_surv <- rdw_surv %>%
+  mutate (death = ifelse(survival_status == 'Survivor',0,1)) %>%
+  mutate (death = as.numeric(death))%>%
+  mutate (RPR_binary = ifelse(RPR >= '0.0928',1,0))
+
+surv_2 = Surv(rdw_surv$days_of_hospitalization, rdw_surv$death)
+
+KMfit2 = survfit(surv_2 ~ RPR_binary, data = rdw_surv, stype=1, ctype=1)
+KMfit2
+
+summary(KMfit2)
+
+summary(KMfit2)$table
+
+```
+
+```{r}
+plot(KMfit2, mark.time=TRUE, xlab='Days of hospitalization', ylab='Survival rate by RPR level',ylim=c(0.4,1), xlim=c(0,35),conf.int=FALSE, col=c('red','blue'), cex=0.3,lty=c(1,1))
+legend("bottomright",1,c('RPR < 0.0928','RPR ≥ 0.0928'), col=c('red','blue'),lty=1) 
+
+surv_diff2 <- survdiff(Surv(days_of_hospitalization, death) ~ RPR_binary, data = rdw_surv)
+
+surv_diff2
+
+
+```
+
+# Medians based on RPR cutoff
+
+## Creating subsets
+
+```{r}
+RPR_above_cutoff <- rdw_all %>%
+  filter(RPR_binary %in% c('1'))
+dim(RPR_above_cutoff)
+
+RPR_below_cutoff <- rdw_all %>%
+  filter(RPR_binary %in% c('0'))
+dim(RPR_below_cutoff)
+dim(rdw_all)
+```
+
+## Wilcoxon test
+
+```{r}
+wilcox.test(baso~RPR_binary,data=rdw_all) 
+wilcox.test(creatinine~RPR_binary,data=rdw_all) 
+wilcox.test(CRT~RPR_binary,data=rdw_all) 
+wilcox.test(eos~RPR_binary,data=rdw_all) 
+wilcox.test(glu~RPR_binary,data=rdw_all) 
+wilcox.test(P~RPR_binary,data=rdw_all) 
+wilcox.test(HCT~RPR_binary,data=rdw_all) 
+wilcox.test(Hg~RPR_binary,data=rdw_all) 
+wilcox.test(lactate~RPR_binary,data=rdw_all) 
+wilcox.test(lymph~RPR_binary,data=rdw_all) 
+wilcox.test(MCH~RPR_binary,data=rdw_all) 
+wilcox.test(MCHC~RPR_binary,data=rdw_all) 
+wilcox.test(MCV~RPR_binary,data=rdw_all) 
+wilcox.test(mono~RPR_binary,data=rdw_all) 
+wilcox.test(neut~RPR_binary,data=rdw_all) 
+wilcox.test(platelets~RPR_binary,data=rdw_all) 
+wilcox.test(RBC~RPR_binary,data=rdw_all) 
+wilcox.test(RDW~RPR_binary,data=rdw_all) 
+wilcox.test(R~RPR_binary,data=rdw_all) 
+wilcox.test(RPR~RPR_binary,data=rdw_all) 
+wilcox.test(sepsis_score~RPR_binary,data=rdw_all) 
+wilcox.test(T~RPR_binary,data=rdw_all) 
+wilcox.test(WBC~RPR_binary,data=rdw_all) 
+```
+
+## Medians above cutoff
+
+```{r}
+RPR_above_cutoff$P <- as.numeric(RPR_above_cutoff$P)
+RPR_above_cutoff$R <- as.numeric(RPR_above_cutoff$R)
+RPR_above_cutoff$creatinine <- as.numeric(RPR_above_cutoff$creatinine)
+RPR_above_cutoff$CRT <- as.numeric(RPR_above_cutoff$CRT)
+
+
+MedianCI(RPR_above_cutoff$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_above_cutoff$WBC, conf.level=0.95, na.rm=TRUE)
+
+
+
+```
+
+## Medians below cutoff
+
+```{r}
+RPR_below_cutoff$P <- as.numeric(RPR_below_cutoff$P)
+RPR_below_cutoff$R <- as.numeric(RPR_below_cutoff$R)
+
+
+
+MedianCI(RPR_below_cutoff$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$WBC, conf.level=0.95, na.rm=TRUE)
+
+```
+
+# Medians based on study groups
+
+```{r}
+MedianCI(rdw_all$baso, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$creatinine, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$CRT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$eos, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$glu, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$P, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$HCT, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$Hg, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$lactate, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$lymph, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$MCH, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$MCHC, conf.level=0.95, na.rm=TRUE)
+MedianCI(RPR_below_cutoff$MCV, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$mono, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$neut, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$platelets, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$RBC, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$RDW, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$R, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$RPR, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$sepsis_score, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$T, conf.level=0.95, na.rm=TRUE)
+MedianCI(rdw_all$WBC, conf.level=0.95, na.rm=TRUE)
+
+```
